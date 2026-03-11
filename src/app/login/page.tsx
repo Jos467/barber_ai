@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Scissors, Sparkles, ShieldCheck, CalendarDays } from 'lucide-react'
+import { Scissors, Sparkles, ShieldCheck, CalendarDays, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -150,14 +151,30 @@ export default function LoginPage() {
                   <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-gray-400">
                     Contraseña
                   </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-orange-500/50 focus:ring-4 focus:ring-orange-500/10"
-                  />
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white outline-none transition focus:border-orange-500/50 focus:ring-4 focus:ring-orange-500/10"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(prev => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 transition hover:text-white"
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {error && (
@@ -176,16 +193,6 @@ export default function LoginPage() {
                     : mode === 'login'
                       ? 'Entrar al dashboard'
                       : 'Crear cuenta'}
-                </button>
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-400">
-                {mode === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}{' '}
-                <button
-                  onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                  className="font-semibold text-orange-400 hover:text-orange-300"
-                >
-                  {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
                 </button>
               </div>
             </div>

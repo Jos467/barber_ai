@@ -11,15 +11,15 @@ import type { Appointment, Barber, Service } from '@/lib/types'
 const statusConfig = {
   confirmed: { label: 'Confirmada', class: 'badge-confirmed' },
   completed: { label: 'Completada', class: 'badge-completed' },
-  pending:   { label: 'Pendiente',  class: 'badge-pending'   },
-  cancelled: { label: 'Cancelada',  class: 'badge-cancelled' },
+  pending: { label: 'Pendiente', class: 'badge-pending' },
+  cancelled: { label: 'Cancelada', class: 'badge-cancelled' },
 }
 
 const sourceIcons = {
-  voice:    { icon: Phone,         color: 'text-purple-400', label: 'Voz IA'   },
-  whatsapp: { icon: MessageCircle, color: 'text-green-400',  label: 'WhatsApp' },
-  manual:   { icon: Monitor,       color: 'text-blue-400',   label: 'Manual'   },
-  web:      { icon: Globe,         color: 'text-orange-400', label: 'Web'      },
+  voice: { icon: Phone, color: 'text-purple-400', label: 'Voz IA' },
+  whatsapp: { icon: MessageCircle, color: 'text-green-400', label: 'WhatsApp' },
+  manual: { icon: Monitor, color: 'text-blue-400', label: 'Manual' },
+  web: { icon: Globe, color: 'text-orange-400', label: 'Web' },
 }
 
 async function getBusinessId(supabase: any, userId: string): Promise<string | null> {
@@ -34,16 +34,16 @@ async function getBusinessId(supabase: any, userId: string): Promise<string | nu
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [barbers, setBarbers]           = useState<Barber[]>([])
-  const [services, setServices]         = useState<Service[]>([])
-  const [businessId, setBusinessId]     = useState('')
-  const [loading, setLoading]           = useState(true)
-  const [showModal, setShowModal]       = useState(false)
-  const [filterDate, setFilterDate]     = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [barbers, setBarbers] = useState<Barber[]>([])
+  const [services, setServices] = useState<Service[]>([])
+  const [businessId, setBusinessId] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [filterDate, setFilterDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [showAllDates, setShowAllDates] = useState(false)
   const [filterStatus, setFilterStatus] = useState('')
-  const [search, setSearch]             = useState('')
-  const [saving, setSaving]             = useState(false)
+  const [search, setSearch] = useState('')
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     customer_name: '', customer_phone: '', barber_id: '',
     service_id: '', scheduled_at: '', notes: '',
@@ -70,8 +70,8 @@ export default function AppointmentsPage() {
       supabase.from('services').select('*').eq('business_id', bizId).eq('active', true),
     ])
 
-    if (aptsRes.data)     setAppointments(aptsRes.data as unknown as Appointment[])
-    if (barbersRes.data)  setBarbers(barbersRes.data)
+    if (aptsRes.data) setAppointments(aptsRes.data as unknown as Appointment[])
+    if (barbersRes.data) setBarbers(barbersRes.data)
     if (servicesRes.data) setServices(servicesRes.data)
     setLoading(false)
   }, [filterDate, showAllDates])
@@ -274,10 +274,10 @@ export default function AppointmentsPage() {
             <h3 className="mb-5 text-lg font-bold text-white">Nueva cita manual</h3>
             <div className="space-y-3">
               {[
-                { label: 'Nombre del cliente', key: 'customer_name',  type: 'text',           placeholder: 'Roberto Herrera' },
-                { label: 'Teléfono',           key: 'customer_phone', type: 'tel',            placeholder: '+504 9999-0000'  },
-                { label: 'Fecha y hora',        key: 'scheduled_at',  type: 'datetime-local', placeholder: ''               },
-                { label: 'Notas',              key: 'notes',          type: 'text',           placeholder: 'Opcional...'    },
+                { label: 'Nombre del cliente', key: 'customer_name', type: 'text', placeholder: 'Roberto Herrera' },
+                { label: 'Teléfono', key: 'customer_phone', type: 'tel', placeholder: '+504 9999-0000' },
+                { label: 'Fecha y hora', key: 'scheduled_at', type: 'datetime-local', placeholder: '' },
+                { label: 'Notas', key: 'notes', type: 'text', placeholder: 'Opcional...' },
               ].map(f => (
                 <div key={f.key}>
                   <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">{f.label}</label>
@@ -288,20 +288,70 @@ export default function AppointmentsPage() {
                 </div>
               ))}
               <div>
-                <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">Barbero</label>
-                <select value={form.barber_id} onChange={e => setForm(p => ({ ...p, barber_id: e.target.value }))}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none focus:border-orange-500/50">
-                  <option value="">Seleccionar barbero</option>
-                  {barbers.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
+                <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">
+                  Barbero
+                </label>
+
+                <div className="relative">
+                  <select
+                    value={form.barber_id}
+                    onChange={e => setForm(p => ({ ...p, barber_id: e.target.value }))}
+                    className="w-full appearance-none rounded-xl border border-white/10 bg-[#111114] px-4 py-2.5 pr-10 text-sm text-white outline-none transition-all duration-200 hover:border-orange-400/30 focus:border-orange-500/50 focus:ring-4 focus:ring-orange-500/10"
+                  >
+                    <option value="" className="text-white">
+                      Seleccionar barbero
+                    </option>
+                    {barbers.map(b => (
+                      <option key={b.id} value={b.id} className="text-white">
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <svg
+                    className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">Servicio</label>
-                <select value={form.service_id} onChange={e => setForm(p => ({ ...p, service_id: e.target.value }))}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none focus:border-orange-500/50">
-                  <option value="">Seleccionar servicio</option>
-                  {services.map(s => <option key={s.id} value={s.id}>{s.name} — L.{s.price}</option>)}
-                </select>
+                <label className="mb-1 block text-xs uppercase tracking-wider text-gray-400">
+                  Servicio
+                </label>
+
+                <div className="relative">
+                  <select
+                    value={form.service_id}
+                    onChange={e => setForm(p => ({ ...p, service_id: e.target.value }))}
+                    className="w-full appearance-none rounded-xl border border-white/10 bg-[#111114] px-4 py-2.5 pr-10 text-sm text-white outline-none transition-all duration-200 hover:border-orange-400/30 focus:border-orange-500/50 focus:ring-4 focus:ring-orange-500/10"
+                  >
+                    <option value="" className="text-white">
+                      Seleccionar servicio
+                    </option>
+                    {services.map(s => (
+                      <option key={s.id} value={s.id} className="text-white">
+                        {s.name} — L.{s.price}
+                      </option>
+                    ))}
+                  </select>
+
+                  <svg
+                    className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
             </div>
             <div className="mt-6 flex gap-3">

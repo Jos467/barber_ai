@@ -4,11 +4,12 @@ import { validateApiKey, unauthorizedResponse } from '@/lib/api-auth'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!validateApiKey(request)) return unauthorizedResponse()
 
   try {
+    const { id } = await params
     const { status } = await request.json()
     const valid = ['pending', 'confirmed', 'completed', 'cancelled']
 
@@ -21,11 +22,11 @@ export async function PATCH(
 
     const supabase = createAdminClient()
     const { error } = await supabase
-      .from('appointments').update({ status }).eq('id', params.id)
+      .from('appointments').update({ status }).eq('id', id)
 
     if (error) throw error
 
-    return Response.json({ success: true, id: params.id, status })
+    return Response.json({ success: true, id, status })
   } catch (err: any) {
     return Response.json({ error: err.message }, { status: 500 })
   }
@@ -33,16 +34,17 @@ export async function PATCH(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!validateApiKey(request)) return unauthorizedResponse()
 
   try {
+    const { id } = await params
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('appointments')
       .select('*, customer:customers(id,name,phone), barber:barbers(id,name), service:services(id,name,price)')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error) throw error

@@ -20,6 +20,27 @@ const sourceConfig = {
   web:      { label: 'Web',      icon: Globe,         color: 'text-orange-400' },
 }
 
+// Función reutilizable para obtener el business_id del usuario actual
+async function getBusinessId(supabase: any, userId: string): Promise<string | null> {
+  // Primero buscar como dueño
+  const { data: ownedBiz } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('owner_id', userId)
+    .single()
+
+  if (ownedBiz) return ownedBiz.id
+
+  // Si no es dueño, buscar como miembro
+  const { data: memberBiz } = await supabase
+    .from('business_members')
+    .select('business_id')
+    .eq('user_id', userId)
+    .single()
+
+  return memberBiz?.business_id || null
+}
+
 export default function DashboardHome() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,14 +72,12 @@ export default function DashboardHome() {
 
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
-      const { data: biz } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('owner_id', data.user.id)
-        .single()
 
-      if (!biz) return
-      await loadAppointments(biz.id)
+      // Obtener business_id como dueño O como miembro
+      const bizId = await getBusinessId(supabase, data.user.id)
+      if (!bizId) return
+
+      await loadAppointments(bizId)
 
       // 🔴 REALTIME — cuando n8n o Vapi creen una cita, aparece al instante
       const channel = supabase
@@ -67,9 +86,9 @@ export default function DashboardHome() {
           event: '*',
           schema: 'public',
           table: 'appointments',
-          filter: `business_id=eq.${biz.id}`,
+          filter: `business_id=eq.${bizId}`,
         }, () => {
-          loadAppointments(biz.id)
+          loadAppointments(bizId)
         })
         .subscribe()
 

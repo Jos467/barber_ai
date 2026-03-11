@@ -5,22 +5,34 @@ import { format } from 'date-fns'
 import { Search, Users, Phone, Mail, Trash2 } from 'lucide-react'
 import type { Customer, Appointment } from '@/lib/types'
 
+async function getBusinessId(supabase: any, userId: string): Promise<string | null> {
+  const { data: ownedBiz } = await supabase
+    .from('businesses').select('id').eq('owner_id', userId).single()
+  if (ownedBiz) return ownedBiz.id
+
+  const { data: memberBiz } = await supabase
+    .from('business_members').select('business_id').eq('user_id', userId).single()
+  return memberBiz?.business_id || null
+}
+
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customers, setCustomers]       = useState<Customer[]>([])
   const [appointments, setAppointments] = useState<Record<string, Appointment[]>>({})
-  const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<Customer | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [search, setSearch]             = useState('')
+  const [selected, setSelected]         = useState<Customer | null>(null)
+  const [loading, setLoading]           = useState(true)
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
-      const { data: biz } = await supabase
-        .from('businesses').select('id').eq('owner_id', data.user.id).single()
-      if (!biz) return
+
+      // Buscar business_id como dueño O como miembro
+      const bizId = await getBusinessId(supabase, data.user.id)
+      if (!bizId) return
+
       const { data: custs } = await supabase
-        .from('customers').select('*').eq('business_id', biz.id).order('name')
+        .from('customers').select('*').eq('business_id', bizId).order('name')
       if (custs) setCustomers(custs)
       setLoading(false)
     })
@@ -61,12 +73,9 @@ export default function CustomersPage() {
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5">
             <Search className="w-4 h-4 text-gray-500" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+            <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por nombre o teléfono..."
-              className="bg-transparent text-white text-sm outline-none w-full placeholder-gray-600"
-            />
+              className="bg-transparent text-white text-sm outline-none w-full placeholder-gray-600" />
           </div>
 
           <div className="glass rounded-2xl overflow-hidden">
@@ -80,13 +89,8 @@ export default function CustomersPage() {
             ) : (
               <div className="divide-y divide-white/5">
                 {filtered.map(c => (
-                  <div
-                    key={c.id}
-                    onClick={() => loadHistory(c)}
-                    className={`w-full text-left px-5 py-4 hover:bg-white/5 transition-colors cursor-pointer ${
-                      selected?.id === c.id ? 'bg-orange-500/5 border-l-2 border-orange-500' : ''
-                    }`}
-                  >
+                  <div key={c.id} onClick={() => loadHistory(c)}
+                    className={`w-full text-left px-5 py-4 hover:bg-white/5 transition-colors cursor-pointer ${selected?.id === c.id ? 'bg-orange-500/5 border-l-2 border-orange-500' : ''}`}>
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-400 font-bold text-sm flex-shrink-0">
                         {c.name.charAt(0).toUpperCase()}
@@ -95,13 +99,8 @@ export default function CustomersPage() {
                         <p className="text-white text-sm font-medium truncate">{c.name}</p>
                         <p className="text-gray-500 text-xs">{c.phone || c.email || 'Sin contacto'}</p>
                       </div>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          if (confirm(`¿Eliminar a ${c.name}?`)) deleteCustomer(c.id)
-                        }}
-                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-1"
-                      >
+                      <button onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar a ${c.name}?`)) deleteCustomer(c.id) }}
+                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-1">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -135,7 +134,6 @@ export default function CustomersPage() {
                   </div>
                 </div>
               </div>
-
               <h3 className="font-syne font-semibold text-white mb-4">Historial de citas</h3>
               <div className="space-y-3">
                 {(appointments[selected.id] || []).length === 0 ? (
@@ -153,9 +151,7 @@ export default function CustomersPage() {
                       <span className={`text-xs px-2 py-0.5 rounded-full mt-1 inline-block ${
                         apt.status === 'completed' ? 'badge-completed' :
                         apt.status === 'cancelled' ? 'badge-cancelled' : 'badge-confirmed'
-                      }`}>
-                        {apt.status}
-                      </span>
+                      }`}>{apt.status}</span>
                     </div>
                   </div>
                 ))}

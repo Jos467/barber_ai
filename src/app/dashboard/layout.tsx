@@ -8,32 +8,55 @@ import {
   Settings, LogOut, Menu, X, Zap
 } from 'lucide-react'
 
+// Todos los items de navegación con su rol requerido
 const navItems = [
-  { href: '/dashboard',              label: 'Inicio',        icon: LayoutDashboard },
-  { href: '/dashboard/appointments', label: 'Citas',         icon: Calendar },
-  { href: '/dashboard/customers',    label: 'Clientes',      icon: Users },
-  { href: '/dashboard/barbers',      label: 'Barberos',      icon: UserCog },
-  { href: '/dashboard/settings',     label: 'Configuración', icon: Settings },
+  { href: '/dashboard',              label: 'Inicio',        icon: LayoutDashboard, adminOnly: false },
+  { href: '/dashboard/appointments', label: 'Citas',         icon: Calendar,        adminOnly: false },
+  { href: '/dashboard/customers',    label: 'Clientes',      icon: Users,           adminOnly: true  },
+  { href: '/dashboard/barbers',      label: 'Barberos',      icon: UserCog,         adminOnly: true  },
+  { href: '/dashboard/settings',     label: 'Configuración', icon: Settings,        adminOnly: true  },
 ]
+
+async function getBusinessInfo(supabase: any, userId: string): Promise<{ name: string, role: string }> {
+  // Buscar como dueño primero
+  const { data: ownedBiz } = await supabase
+    .from('businesses').select('name').eq('owner_id', userId).single()
+  if (ownedBiz) return { name: ownedBiz.name, role: 'admin' }
+
+  // Buscar como miembro
+  const { data: member } = await supabase
+    .from('business_members')
+    .select('role, business_id')
+    .eq('user_id', userId)
+    .single()
+  if (!member) return { name: 'Barbería', role: 'barber' }
+
+  const { data: biz } = await supabase
+    .from('businesses').select('name').eq('id', member.business_id).single()
+
+  return {
+    name: biz?.name || 'Barbería',
+    role: member.role || 'barber',
+  }
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [businessName, setBusinessName] = useState('Barbería El Estilo')
-  const [userEmail, setUserEmail] = useState('')
+  const [userEmail, setUserEmail]       = useState('')
+  const [userRole, setUserRole]         = useState<'admin' | 'barber'>('barber')
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.push('/login'); return }
       setUserEmail(data.user.email || '')
-      supabase
-        .from('businesses')
-        .select('name')
-        .eq('owner_id', data.user.id)
-        .single()
-        .then(({ data: biz }) => { if (biz) setBusinessName(biz.name) })
+
+      const info = await getBusinessInfo(supabase, data.user.id)
+      setBusinessName(info.name)
+      setUserRole(info.role as 'admin' | 'barber')
     })
   }, [router])
 
@@ -42,6 +65,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     await supabase.auth.signOut()
     router.push('/login')
   }
+
+  // Filtrar nav según el rol
+  const visibleNavItems = navItems.filter(item => !item.adminOnly || userRole === 'admin')
 
   const Sidebar = () => (
     <div className="flex flex-col h-full">
@@ -64,7 +90,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = href === '/dashboard' ? pathname === href : pathname.startsWith(href)
           return (
             <Link
@@ -91,7 +117,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs text-white truncate">{userEmail}</p>
-            <p className="text-[10px] text-gray-500">Administrador</p>
+            {/* Badge de rol dinámico */}
+            <p className="text-[10px] text-gray-500">
+              {userRole === 'admin' ? 'Administrador' : 'Barbero'}
+            </p>
           </div>
           <button onClick={handleLogout} className="text-gray-500 hover:text-red-400 transition-colors">
             <LogOut className="w-4 h-4" />

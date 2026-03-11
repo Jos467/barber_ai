@@ -17,24 +17,28 @@ async function getBusinessId(supabase: any, userId: string): Promise<string | nu
 
 export default function CustomersPage() {
   const [customers, setCustomers]       = useState<Customer[]>([])
+  const [businessId, setBusinessId]     = useState('')
   const [appointments, setAppointments] = useState<Record<string, Appointment[]>>({})
   const [search, setSearch]             = useState('')
   const [selected, setSelected]         = useState<Customer | null>(null)
   const [loading, setLoading]           = useState(true)
 
+  async function loadCustomers(bizId: string) {
+    const supabase = createClient()
+    const { data: custs } = await supabase
+      .from('customers').select('*').eq('business_id', bizId).order('name')
+    if (custs) setCustomers(custs)
+    setLoading(false)
+  }
+
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
-
-      // Buscar business_id como dueño O como miembro
       const bizId = await getBusinessId(supabase, data.user.id)
       if (!bizId) return
-
-      const { data: custs } = await supabase
-        .from('customers').select('*').eq('business_id', bizId).order('name')
-      if (custs) setCustomers(custs)
-      setLoading(false)
+      setBusinessId(bizId)
+      loadCustomers(bizId)
     })
   }, [])
 
@@ -51,11 +55,17 @@ export default function CustomersPage() {
     if (data) setAppointments(p => ({ ...p, [customer.id]: data as unknown as Appointment[] }))
   }
 
-  async function deleteCustomer(id: string) {
+  async function deleteCustomer(id: string, name: string) {
+    if (!confirm(`¿Eliminar a ${name}?`)) return
     const supabase = createClient()
-    await supabase.from('customers').delete().eq('id', id)
-    setCustomers(prev => prev.filter(c => c.id !== id))
+    const { error } = await supabase.from('customers').delete().eq('id', id)
+    if (error) {
+      alert(`Error al eliminar: ${error.message}`)
+      return
+    }
+    // Solo actualizar UI si Supabase confirmó el delete
     if (selected?.id === id) setSelected(null)
+    await loadCustomers(businessId)
   }
 
   const filtered = customers.filter(c =>
@@ -99,8 +109,9 @@ export default function CustomersPage() {
                         <p className="text-white text-sm font-medium truncate">{c.name}</p>
                         <p className="text-gray-500 text-xs">{c.phone || c.email || 'Sin contacto'}</p>
                       </div>
-                      <button onClick={e => { e.stopPropagation(); if (confirm(`¿Eliminar a ${c.name}?`)) deleteCustomer(c.id) }}
-                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-1">
+                      <button
+                        onClick={e => { e.stopPropagation(); deleteCustomer(c.id, c.name) }}
+                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-1 rounded-lg hover:bg-red-500/10">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>

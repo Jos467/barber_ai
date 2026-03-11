@@ -60,8 +60,13 @@ export default function BarbersPage() {
   async function deleteBarber(id: string, name: string) {
     if (!confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) return
     const supabase = createClient()
-    await supabase.from('barbers').delete().eq('id', id)
-    setBarbers(prev => prev.filter(b => b.id !== id))
+    const { error } = await supabase.from('barbers').delete().eq('id', id)
+    if (error) {
+      alert(`Error al eliminar: ${error.message}`)
+      return
+    }
+    // Solo actualizar UI si Supabase confirmó el delete
+    await load(businessId)
   }
 
   return (
@@ -130,7 +135,6 @@ export default function BarbersPage() {
                 <span className={`text-xs px-2.5 py-1 rounded-full ${b.active ? 'badge-completed' : 'badge-cancelled'}`}>
                   {b.active ? 'Activo' : 'Inactivo'}
                 </span>
-                {/* Toggle activo/inactivo */}
                 <button onClick={() => toggleActive(b.id, b.active)}
                   className="text-gray-500 hover:text-orange-400 transition-colors"
                   title={b.active ? 'Desactivar' : 'Activar'}>
@@ -139,12 +143,10 @@ export default function BarbersPage() {
                     : <ToggleLeft className="w-6 h-6" />
                   }
                 </button>
-                {/* Botón eliminar */}
                 <button
                   onClick={() => deleteBarber(b.id, b.name)}
                   className="text-gray-600 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10"
-                  title="Eliminar barbero"
-                >
+                  title="Eliminar barbero">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

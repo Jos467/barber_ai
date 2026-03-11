@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { UserCog, Plus, ToggleLeft, ToggleRight } from 'lucide-react'
+import { UserCog, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react'
 import type { Barber } from '@/lib/types'
 
 async function getBusinessId(supabase: any, userId: string): Promise<string | null> {
@@ -34,11 +34,8 @@ export default function BarbersPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
-
-      // Buscar business_id como dueño O como miembro
       const bizId = await getBusinessId(supabase, data.user.id)
       if (!bizId) return
-
       setBusinessId(bizId)
       load(bizId)
     })
@@ -58,6 +55,13 @@ export default function BarbersPage() {
     const supabase = createClient()
     await supabase.from('barbers').update({ active: !current }).eq('id', id)
     load(businessId)
+  }
+
+  async function deleteBarber(id: string, name: string) {
+    if (!confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) return
+    const supabase = createClient()
+    await supabase.from('barbers').delete().eq('id', id)
+    setBarbers(prev => prev.filter(b => b.id !== id))
   }
 
   return (
@@ -92,7 +96,10 @@ export default function BarbersPage() {
             ))}
           </div>
           <div className="flex gap-3 mt-4">
-            <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-xl border border-white/10 text-gray-400 text-sm hover:text-white transition-colors">Cancelar</button>
+            <button onClick={() => setShowForm(false)}
+              className="px-4 py-2 rounded-xl border border-white/10 text-gray-400 text-sm hover:text-white transition-colors">
+              Cancelar
+            </button>
             <button onClick={addBarber} disabled={saving || !form.name}
               className="bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-2 text-sm transition-all">
               {saving ? 'Guardando...' : 'Agregar barbero'}
@@ -123,8 +130,22 @@ export default function BarbersPage() {
                 <span className={`text-xs px-2.5 py-1 rounded-full ${b.active ? 'badge-completed' : 'badge-cancelled'}`}>
                   {b.active ? 'Activo' : 'Inactivo'}
                 </span>
-                <button onClick={() => toggleActive(b.id, b.active)} className="text-gray-500 hover:text-orange-400 transition-colors">
-                  {b.active ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6" />}
+                {/* Toggle activo/inactivo */}
+                <button onClick={() => toggleActive(b.id, b.active)}
+                  className="text-gray-500 hover:text-orange-400 transition-colors"
+                  title={b.active ? 'Desactivar' : 'Activar'}>
+                  {b.active
+                    ? <ToggleRight className="w-6 h-6 text-emerald-400" />
+                    : <ToggleLeft className="w-6 h-6" />
+                  }
+                </button>
+                {/* Botón eliminar */}
+                <button
+                  onClick={() => deleteBarber(b.id, b.name)}
+                  className="text-gray-600 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10"
+                  title="Eliminar barbero"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             ))}

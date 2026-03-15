@@ -108,3 +108,38 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: err.message }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  if (!validateApiKey(request)) return unauthorizedResponse()
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const confirmation_code = searchParams.get('confirmation_code')
+
+    if (!confirmation_code) {
+      return Response.json({ error: 'Falta confirmation_code' }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
+
+    // Buscar cita por código (primeros 8 chars del ID en mayúsculas)
+    const { data: appointments } = await supabase
+      .from('appointments')
+      .select('id')
+      .ilike('id', `${confirmation_code.toLowerCase()}%`)
+
+    if (!appointments || appointments.length === 0) {
+      return Response.json({ error: 'Cita no encontrada' }, { status: 404 })
+    }
+
+    await supabase
+      .from('appointments')
+      .delete()
+      .eq('id', appointments[0].id)
+
+    return Response.json({ success: true, message: 'Cita eliminada correctamente' })
+
+  } catch (err: any) {
+    return Response.json({ error: err.message }, { status: 500 })
+  }
+}

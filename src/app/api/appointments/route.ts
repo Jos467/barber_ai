@@ -122,11 +122,10 @@ export async function DELETE(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    // Buscar cita por código (primeros 8 chars del ID en mayúsculas)
     const { data: appointments } = await supabase
       .from('appointments')
       .select('id')
-      .ilike('id', `${confirmation_code.toLowerCase()}%`)
+      .filter('id::text', 'ilike', `${confirmation_code.toLowerCase()}%`)
 
     if (!appointments || appointments.length === 0) {
       return Response.json({ error: 'Cita no encontrada' }, { status: 404 })

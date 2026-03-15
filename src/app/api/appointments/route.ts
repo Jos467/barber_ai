@@ -122,19 +122,17 @@ export async function DELETE(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    const { data: appointments } = await supabase
-      .from('appointments')
-      .select('id')
-      .filter('id::text', 'ilike', `${confirmation_code.toLowerCase()}%`)
+    const { data, error } = await supabase
+      .rpc('find_appointment_by_code', { code: confirmation_code })
 
-    if (!appointments || appointments.length === 0) {
+    if (error || !data) {
       return Response.json({ error: 'Cita no encontrada' }, { status: 404 })
     }
 
     await supabase
       .from('appointments')
       .delete()
-      .eq('id', appointments[0].id)
+      .eq('id', data)
 
     return Response.json({ success: true, message: 'Cita eliminada correctamente' })
 

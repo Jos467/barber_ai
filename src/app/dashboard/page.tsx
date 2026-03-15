@@ -2,9 +2,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
+import { toZonedTime } from 'date-fns-tz'
 import { es } from 'date-fns/locale'
 import { Calendar, CheckCircle2, Clock, XCircle, Phone, MessageCircle, Monitor, Globe } from 'lucide-react'
 import type { Appointment } from '@/lib/types'
+
+const TZ = 'America/Tegucigalpa'
 
 const statusConfig = {
   confirmed:  { label: 'Confirmada',  class: 'badge-confirmed' },
@@ -20,9 +23,7 @@ const sourceConfig = {
   web:      { label: 'Web',      icon: Globe,         color: 'text-orange-400' },
 }
 
-// Función reutilizable para obtener el business_id del usuario actual
 async function getBusinessId(supabase: any, userId: string): Promise<string | null> {
-  // Primero buscar como dueño
   const { data: ownedBiz } = await supabase
     .from('businesses')
     .select('id')
@@ -31,7 +32,6 @@ async function getBusinessId(supabase: any, userId: string): Promise<string | nu
 
   if (ownedBiz) return ownedBiz.id
 
-  // Si no es dueño, buscar como miembro
   const { data: memberBiz } = await supabase
     .from('business_members')
     .select('business_id')
@@ -39,6 +39,10 @@ async function getBusinessId(supabase: any, userId: string): Promise<string | nu
     .single()
 
   return memberBiz?.business_id || null
+}
+
+function formatHour(dateStr: string) {
+  return format(toZonedTime(new Date(dateStr), TZ), 'HH:mm')
 }
 
 export default function DashboardHome() {
@@ -73,13 +77,11 @@ export default function DashboardHome() {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
 
-      // Obtener business_id como dueño O como miembro
       const bizId = await getBusinessId(supabase, data.user.id)
       if (!bizId) return
 
       await loadAppointments(bizId)
 
-      // 🔴 REALTIME — cuando n8n o Vapi creen una cita, aparece al instante
       const channel = supabase
         .channel('appointments-realtime')
         .on('postgres_changes', {
@@ -172,7 +174,7 @@ export default function DashboardHome() {
                 >
                   <div className="w-14 text-center flex-shrink-0">
                     <p className="font-syne font-bold text-white text-lg leading-none">
-                      {format(new Date(apt.scheduled_at), 'HH:mm')}
+                      {formatHour(apt.scheduled_at)}
                     </p>
                   </div>
 

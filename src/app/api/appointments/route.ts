@@ -96,13 +96,13 @@ export async function POST(request: NextRequest) {
     const confirmationCode = appointment!.id.split('-')[0].toUpperCase()
 
     return Response.json({
-      id: appointment!.id,
-      scheduled_at: appointment!.scheduled_at,
-      barber_name: barber?.name || '',
-      service_name: service?.name || '',
-      customer_name,
-      confirmation_code: confirmationCode,
-    }, { status: 201 })
+  id: appointment!.id,
+  scheduled_at: appointment!.scheduled_at,
+  barber_name: barber?.name || '',
+  service_name: service?.name || '',
+  customer_name: customer_name.replace(/^=/, ''),
+  confirmation_code: confirmationCode,
+}, { status: 201 })
 
   } catch (err: any) {
     return Response.json({ error: err.message }, { status: 500 })

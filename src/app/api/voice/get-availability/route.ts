@@ -22,11 +22,20 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const date = body?.date;
+
+    // 🔥 AQUÍ ESTÁ LA CLAVE
+    const toolCall = body?.message?.toolCallList?.[0];
+
+    const date =
+      toolCall?.function?.arguments?.date ||
+      body?.date;
 
     if (!date) {
       return NextResponse.json(
-        { error: "Missing date", received: body },
+        {
+          error: "Missing date",
+          received: body,
+        },
         { status: 400, headers: corsHeaders() }
       );
     }
@@ -43,10 +52,18 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
 
-    return NextResponse.json(data, {
-      status: res.status,
-      headers: corsHeaders(),
-    });
+    // 🔥 RESPUESTA CORRECTA PARA VAPI
+    return NextResponse.json(
+      {
+        results: [
+          {
+            toolCallId: toolCall?.id,
+            result: data,
+          },
+        ],
+      },
+      { status: 200, headers: corsHeaders() }
+    );
   } catch (error) {
     return NextResponse.json(
       {

@@ -99,18 +99,16 @@ export async function POST(req: NextRequest) {
     );
 
     const allSlots = generateTimeSlots(9, 18, 30);
-    const available_slots = allSlots.filter((slot) => !bookedTimes.has(slot));
 
-    return NextResponse.json(
-      {
-        success: true,
-        date,
-        barber_id,
-        available_slots,
-        booked_slots: Array.from(bookedTimes),
-      },
-      { status: 200, headers: corsHeaders() }
-    );
+    const availability = allSlots.map((slot) => ({
+      time: slot,
+      available: !bookedTimes.has(slot),
+    }));
+
+    return NextResponse.json(availability, {
+      status: 200,
+      headers: corsHeaders(),
+    });
   } catch (error) {
     return NextResponse.json(
       {

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase
       .from("services")
-      .select("id, name, price, duration_minutes, active")
+      .select("id, name, price, duration_minutes")
       .eq("business_id", business_id)
       .eq("active", true)
       .order("name", { ascending: true });
@@ -52,13 +52,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        services: data ?? [],
-      },
-      { status: 200, headers: corsHeaders() }
-    );
+    return NextResponse.json(data ?? [], {
+      status: 200,
+      headers: corsHeaders(),
+    });
   } catch (error) {
     return NextResponse.json(
       {

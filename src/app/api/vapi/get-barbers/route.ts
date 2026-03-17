@@ -52,13 +52,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        barbers: data ?? [],
-      },
-      { status: 200, headers: corsHeaders() }
-    );
+    return NextResponse.json(data ?? [], {
+      status: 200,
+      headers: corsHeaders(),
+    });
   } catch (error) {
     return NextResponse.json(
       {

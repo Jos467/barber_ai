@@ -22,13 +22,19 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, payload } = body;
+    console.log("VOICE ACTION BODY:", body);
 
-    if (action === "get_availability") {
-      const date = payload?.date;
+    const action = body?.action;
+    const nestedDate = body?.payload?.date;
+    const flatDate = body?.date;
+
+    const date =
+      nestedDate || flatDate;
+
+    if (action === "get_availability" || date) {
       if (!date) {
         return NextResponse.json(
-          { error: "Missing date" },
+          { error: "Missing date", received: body },
           { status: 400, headers: corsHeaders() }
         );
       }
@@ -44,62 +50,15 @@ export async function POST(req: NextRequest) {
       );
 
       const data = await res.json();
-      return NextResponse.json(data, {
-        status: res.status,
-        headers: corsHeaders(),
-      });
-    }
 
-    if (action === "create_customer") {
-      const res = await fetch(`${BASE_URL}/api/customers`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY,
-        },
-        body: JSON.stringify({
-          name: payload?.name,
-          phone: payload?.phone,
-          business_id: "aaaaaaaa-0000-0000-0000-000000000001",
-        }),
-      });
-
-      const data = await res.json();
-      return NextResponse.json(data, {
-        status: res.status,
-        headers: corsHeaders(),
-      });
-    }
-
-    if (action === "book_appointment") {
-      const scheduled_at = `${payload?.date}T${payload?.time}:00-06:00`;
-
-      const res = await fetch(`${BASE_URL}/api/appointments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY,
-        },
-        body: JSON.stringify({
-          customer_name: payload?.customer_name,
-          customer_phone: payload?.customer_phone,
-          scheduled_at,
-          source: "voice",
-          barber_id: "bbbbbbbb-0000-0000-0000-000000000002",
-          service_id: "cccccccc-0000-0000-0000-000000000001",
-          business_id: "aaaaaaaa-0000-0000-0000-000000000001",
-        }),
-      });
-
-      const data = await res.json();
-      return NextResponse.json(data, {
-        status: res.status,
-        headers: corsHeaders(),
-      });
+      return NextResponse.json(
+        { success: true, sentDate: date, data },
+        { status: res.status, headers: corsHeaders() }
+      );
     }
 
     return NextResponse.json(
-      { error: "Unsupported action" },
+      { error: "Unsupported action", received: body },
       { status: 400, headers: corsHeaders() }
     );
   } catch (error) {

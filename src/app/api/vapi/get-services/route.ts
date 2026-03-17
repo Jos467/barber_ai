@@ -52,7 +52,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(data ?? [], {
+    const normalized = (data ?? []).map((service) => ({
+      id: service.id,
+      name: service.name,
+      price: service.price,
+      duration_minutes: service.duration_minutes,
+      display_name: `${service.name} - ${service.duration_minutes} min - L ${service.price}`,
+    }));
+
+    return NextResponse.json(normalized, {
       status: 200,
       headers: corsHeaders(),
     });

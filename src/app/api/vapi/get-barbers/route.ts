@@ -52,7 +52,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(data ?? [], {
+    const normalized = (data ?? []).map((barber, index) => ({
+      id: barber.id,
+      name: barber.name,
+      active: barber.active,
+      is_default_for_no_preference: index === 0,
+    }));
+
+    return NextResponse.json(normalized, {
       status: 200,
       headers: corsHeaders(),
     });

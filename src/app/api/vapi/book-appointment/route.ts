@@ -16,6 +16,10 @@ function corsHeaders() {
   };
 }
 
+function generateConfirmationCode(id: string) {
+  return id.replace(/-/g, "").slice(0, 8).toUpperCase();
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
@@ -85,7 +89,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data: appointment, error } = await supabase
       .from("appointments")
       .insert([
         {
@@ -109,10 +113,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const { data: barber } = await supabase
+      .from("barbers")
+      .select("name")
+      .eq("id", barber_id)
+      .single();
+
+    const { data: service } = await supabase
+      .from("services")
+      .select("name")
+      .eq("id", service_id)
+      .single();
+
     return NextResponse.json(
       {
         success: true,
-        appointment: data,
+        confirmed: true,
+        message: "Appointment booked successfully",
+        appointment_id: appointment.id,
+        confirmation_code: generateConfirmationCode(appointment.id),
+        customer_name: appointment.customer_name,
+        customer_phone: appointment.customer_phone,
+        scheduled_at: appointment.scheduled_at,
+        barber_id: appointment.barber_id,
+        barber_name: barber?.name ?? null,
+        service_id: appointment.service_id,
+        service_name: service?.name ?? null,
+        status: appointment.status,
+        source: appointment.source,
       },
       { status: 200, headers: corsHeaders() }
     );

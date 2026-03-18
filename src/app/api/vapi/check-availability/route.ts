@@ -34,6 +34,23 @@ function generateTimeSlots(
   return slots;
 }
 
+function toolResult(toolCallId: string | null, result: unknown) {
+  return NextResponse.json(
+    {
+      results: [
+        {
+          toolCallId,
+          result,
+        },
+      ],
+    },
+    {
+      status: 200,
+      headers: corsHeaders(),
+    }
+  );
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
@@ -42,6 +59,8 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  let toolCallId: string | null = null;
+
   try {
     const apiKey = req.headers.get("x-api-key");
 
@@ -52,17 +71,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
-    const date = body.date;
-    const barber_id = body.barber_id || null;
+    const body = await req.json();
+
+    const toolCall = body?.message?.toolCallList?.[0];
+    toolCallId = toolCall?.id ?? null;
+
+    const argsRaw = toolCall?.function?.arguments ?? {};
+    const args = typeof argsRaw === "string" ? JSON.parse(argsRaw) : argsRaw;
+
+    const date = args?.date;
+    const barber_id = args?.barber_id || null;
+    const requested_time = args?.requested_time || null;
     const business_id =
-      body.business_id || "aaaaaaaa-0000-0000-0000-000000000001";
+      args?.business_id || "aaaaaaaa-0000-0000-0000-000000000001";
 
     if (!date || typeof date !== "string") {
-      return NextResponse.json(
-        { error: "date is required in format YYYY-MM-DD" },
-        { status: 400, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: "date is required in format YYYY-MM-DD",
+      });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: "date must be YYYY-MM-DD",
+      });
     }
 
     const startOfDay = `${date}T00:00:00-06:00`;
@@ -83,10 +119,11 @@ export async function POST(req: NextRequest) {
     const { data: appointments, error } = await query;
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: error.message,
+      });
     }
 
     const bookedTimes = new Set(
@@ -105,16 +142,33 @@ export async function POST(req: NextRequest) {
       available: !bookedTimes.has(slot),
     }));
 
-    return NextResponse.json(availability, {
-      status: 200,
-      headers: corsHeaders(),
+    const requestedSlot =
+      requested_time && typeof requested_time === "string"
+        ? availability.find((slot) => slot.time === requested_time) ?? null
+        : null;
+
+    const nextAvailableSlots = availability
+      .filter((slot) => slot.available)
+      .slice(0, 5)
+      .map((slot) => slot.time);
+
+    return toolResult(toolCallId, {
+      success: true,
+      date,
+      barber_id,
+      requested_time,
+      requested_time_available: requestedSlot
+        ? requestedSlot.available
+        : null,
+      next_available_slots: nextAvailableSlots,
+      all_slots: availability,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
-      { status: 500, headers: corsHeaders() }
-    );
+    return toolResult(toolCallId, {
+      success: false,
+      error: true,
+      message:
+        error instanceof Error ? error.message : "Internal server error",
+    });
   }
 }

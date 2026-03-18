@@ -20,6 +20,23 @@ function generateConfirmationCode(id: string) {
   return id.replace(/-/g, "").slice(0, 8).toUpperCase();
 }
 
+function toolResult(toolCallId: string | null, result: unknown) {
+  return NextResponse.json(
+    {
+      results: [
+        {
+          toolCallId,
+          result,
+        },
+      ],
+    },
+    {
+      status: 200,
+      headers: corsHeaders(),
+    }
+  );
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
@@ -28,6 +45,8 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  let toolCallId: string | null = null;
+
   try {
     const apiKey = req.headers.get("x-api-key");
 
@@ -38,7 +57,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json();
+
+    const toolCall = body?.message?.toolCallList?.[0];
+    toolCallId = toolCall?.id ?? null;
+
+    const argsRaw = toolCall?.function?.arguments ?? {};
+    const args = typeof argsRaw === "string" ? JSON.parse(argsRaw) : argsRaw;
 
     const {
       customer_name,
@@ -49,7 +74,7 @@ export async function POST(req: NextRequest) {
       business_id = "aaaaaaaa-0000-0000-0000-000000000001",
       source = "voice",
       notes = null,
-    } = body;
+    } = args ?? {};
 
     if (
       !customer_name ||
@@ -58,16 +83,15 @@ export async function POST(req: NextRequest) {
       !service_id ||
       !scheduled_at
     ) {
-      return NextResponse.json(
-        {
-          error:
-            "customer_name, customer_phone, barber_id, service_id and scheduled_at are required",
-        },
-        { status: 400, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message:
+          "customer_name, customer_phone, barber_id, service_id and scheduled_at are required",
+      });
     }
 
-    // 1) Buscar o crear cliente por teléfono
+    // Buscar o crear cliente
     let customerId: string | null = null;
 
     const { data: existingCustomer, error: existingCustomerError } = await supabase
@@ -78,16 +102,16 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (existingCustomerError) {
-      return NextResponse.json(
-        { error: existingCustomerError.message },
-        { status: 500, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: existingCustomerError.message,
+      });
     }
 
     if (existingCustomer?.id) {
       customerId = existingCustomer.id;
 
-      // Actualizar nombre si vino distinto o estaba vacío
       if (existingCustomer.name !== customer_name) {
         await supabase
           .from("customers")
@@ -108,16 +132,17 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (createCustomerError) {
-        return NextResponse.json(
-          { error: createCustomerError.message },
-          { status: 500, headers: corsHeaders() }
-        );
+        return toolResult(toolCallId, {
+          success: false,
+          error: true,
+          message: createCustomerError.message,
+        });
       }
 
       customerId = createdCustomer.id;
     }
 
-    // 2) Leer servicio para obtener duración
+    // Leer servicio para obtener nombre y duración
     const { data: service, error: serviceError } = await supabase
       .from("services")
       .select("id, name, duration_minutes")
@@ -126,13 +151,14 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (serviceError) {
-      return NextResponse.json(
-        { error: serviceError.message },
-        { status: 500, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: serviceError.message,
+      });
     }
 
-    // 3) Validar conflicto exacto
+    // Verificar conflicto de horario
     const { data: conflicting, error: conflictError } = await supabase
       .from("appointments")
       .select("id")
@@ -143,20 +169,22 @@ export async function POST(req: NextRequest) {
       .limit(1);
 
     if (conflictError) {
-      return NextResponse.json(
-        { error: conflictError.message },
-        { status: 500, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: conflictError.message,
+      });
     }
 
     if (conflicting && conflicting.length > 0) {
-      return NextResponse.json(
-        { error: "This time slot is no longer available" },
-        { status: 409, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: "This time slot is no longer available",
+      });
     }
 
-    // 4) Insertar cita completa
+    // Insertar cita
     const { data: appointment, error: appointmentError } = await supabase
       .from("appointments")
       .insert([
@@ -172,43 +200,50 @@ export async function POST(req: NextRequest) {
           notes,
         },
       ])
-      .select("id, business_id, barber_id, customer_id, service_id, scheduled_at, duration_minutes, status, source, created_at")
+      .select(
+        "id, business_id, barber_id, customer_id, service_id, scheduled_at, duration_minutes, status, source, created_at"
+      )
       .single();
 
     if (appointmentError) {
-      return NextResponse.json(
-        { error: appointmentError.message },
-        { status: 500, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: appointmentError.message,
+      });
     }
 
-    // 5) Leer nombre del barbero
+    // Obtener nombre del barbero
     const { data: barber } = await supabase
       .from("barbers")
       .select("name")
       .eq("id", barber_id)
       .single();
 
-    return NextResponse.json(
-      {
-        success: true,
-        confirmed: true,
-        id: appointment.id,
-        scheduled_at: appointment.scheduled_at,
-        barber_name: barber?.name ?? null,
-        service_name: service.name,
-        customer_name,
-        confirmation_code: generateConfirmationCode(appointment.id),
-        source: appointment.source,
-      },
-      { status: 200, headers: corsHeaders() }
-    );
+    return toolResult(toolCallId, {
+      success: true,
+      confirmed: true,
+      message: "Appointment booked successfully",
+      id: appointment.id,
+      appointment_id: appointment.id,
+      confirmation_code: generateConfirmationCode(appointment.id),
+      customer_name,
+      customer_phone,
+      scheduled_at: appointment.scheduled_at,
+      barber_id: appointment.barber_id,
+      barber_name: barber?.name ?? null,
+      service_id: appointment.service_id,
+      service_name: service.name,
+      duration_minutes: appointment.duration_minutes,
+      status: appointment.status,
+      source: appointment.source,
+    });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
-      { status: 500, headers: corsHeaders() }
-    );
+    return toolResult(toolCallId, {
+      success: false,
+      error: true,
+      message:
+        error instanceof Error ? error.message : "Internal server error",
+    });
   }
 }

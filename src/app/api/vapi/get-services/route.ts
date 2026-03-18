@@ -16,17 +16,22 @@ function corsHeaders() {
   };
 }
 
+function toolResult(toolCallId: string | null, result: unknown) {
+  return NextResponse.json(
+    { results: [{ toolCallId, result }] },
+    { status: 200, headers: corsHeaders() }
+  );
+}
+
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: corsHeaders(),
-  });
+  return new NextResponse(null, { status: 200, headers: corsHeaders() });
 }
 
 export async function POST(req: NextRequest) {
+  let toolCallId: string | null = null;
+
   try {
     const apiKey = req.headers.get("x-api-key");
-
     if (apiKey !== API_KEY) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -34,25 +39,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json();
+
+    const toolCall = body?.message?.toolCallList?.[0];
+    toolCallId = toolCall?.id ?? null;
+
+    const argsRaw = toolCall?.function?.arguments ?? {};
+    const args = typeof argsRaw === "string" ? JSON.parse(argsRaw) : argsRaw;
+
     const business_id =
-      body.business_id || "aaaaaaaa-0000-0000-0000-000000000001";
+      args?.business_id || "aaaaaaaa-0000-0000-0000-000000000001";
 
     const { data, error } = await supabase
       .from("services")
-      .select("id, name, price, duration_minutes")
+      .select("id, name, price, duration_minutes, active")
       .eq("business_id", business_id)
       .eq("active", true)
       .order("name", { ascending: true });
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500, headers: corsHeaders() }
-      );
+      return toolResult(toolCallId, {
+        success: false,
+        error: true,
+        message: error.message,
+      });
     }
 
-    const normalized = (data ?? []).map((service) => ({
+    const normalized = (data ?? []).map((service: any) => ({
       id: service.id,
       name: service.name,
       price: service.price,
@@ -60,16 +73,12 @@ export async function POST(req: NextRequest) {
       display_name: `${service.name} - ${service.duration_minutes} min - L ${service.price}`,
     }));
 
-    return NextResponse.json(normalized, {
-      status: 200,
-      headers: corsHeaders(),
-    });
+    return toolResult(toolCallId, normalized);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
-      { status: 500, headers: corsHeaders() }
-    );
+    return toolResult(toolCallId, {
+      success: false,
+      error: true,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
   }
 }

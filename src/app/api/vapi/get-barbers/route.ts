@@ -17,16 +17,14 @@ function corsHeaders() {
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: corsHeaders(),
-  });
+  return new NextResponse(null, { status: 200, headers: corsHeaders() });
 }
 
 export async function POST(req: NextRequest) {
+  let toolCallId: string | null = null;
+
   try {
     const apiKey = req.headers.get("x-api-key");
-
     if (apiKey !== API_KEY) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -34,9 +32,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json();
+
+    const toolCall = body?.message?.toolCallList?.[0];
+    toolCallId = toolCall?.id ?? null;
+
+    const argsRaw = toolCall?.function?.arguments ?? {};
+    const args = typeof argsRaw === "string" ? JSON.parse(argsRaw) : argsRaw;
+
     const business_id =
-      body.business_id || "aaaaaaaa-0000-0000-0000-000000000001";
+      args?.business_id || "aaaaaaaa-0000-0000-0000-000000000001";
 
     const { data, error } = await supabase
       .from("barbers")
@@ -47,28 +52,43 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       return NextResponse.json(
-        { error: error.message },
-        { status: 500, headers: corsHeaders() }
+        {
+          results: [
+            {
+              toolCallId,
+              result: { success: false, error: true, message: error.message },
+            },
+          ],
+        },
+        { status: 200, headers: corsHeaders() }
       );
     }
 
-    const normalized = (data ?? []).map((barber, index) => ({
-      id: barber.id,
-      name: barber.name,
-      active: barber.active,
-      is_default_for_no_preference: index === 0,
+    const barbers = (data ?? []).map((b: any, index: number) => ({
+      id: b.id,
+      name: b.name,
+      is_default_for_no_preference: index === 0, // o define tu lógica de "default" real
     }));
 
-    return NextResponse.json(normalized, {
-      status: 200,
-      headers: corsHeaders(),
-    });
+    return NextResponse.json(
+      { results: [{ toolCallId, result: barbers }] },
+      { status: 200, headers: corsHeaders() }
+    );
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Internal server error",
+        results: [
+          {
+            toolCallId,
+            result: {
+              success: false,
+              error: true,
+              message: error instanceof Error ? error.message : "Internal server error",
+            },
+          },
+        ],
       },
-      { status: 500, headers: corsHeaders() }
+      { status: 200, headers: corsHeaders() }
     );
   }
 }

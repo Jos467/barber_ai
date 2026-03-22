@@ -140,3 +140,22 @@ export async function DELETE(request: NextRequest) {
     return Response.json({ error: err.message }, { status: 500 })
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  if (!validateApiKey(request)) return unauthorizedResponse()
+  try {
+    const { searchParams } = new URL(request.url)
+    const confirmation_code = searchParams.get('confirmation_code')
+    const body = await request.json()
+    if (!confirmation_code) return Response.json({ error: 'Falta confirmation_code' }, { status: 400 })
+    const supabase = createAdminClient()
+    const { data: appt } = await supabase.rpc('find_appointment_by_code', { code: confirmation_code })
+    if (!appt) return Response.json({ error: 'Cita no encontrada' }, { status: 404 })
+    const { data, error } = await supabase
+      .from('appointments').update({ status: body.status || 'cancelled' }).eq('id', appt).select().single()
+    if (error) throw error
+    return Response.json(data)
+  } catch (err: any) {
+    return Response.json({ error: err.message }, { status: 500 })
+  }
+}

@@ -41,6 +41,7 @@ const statusConfig = {
   pending: { label: 'Pendiente', class: 'badge-pending' },
   cancelled: { label: 'Cancelada', class: 'badge-cancelled' },
 }
+//fasdsadsadsa
 
 const sourceIcons = {
   voice: { icon: Phone, color: 'text-purple-400', label: 'Voz IA' },

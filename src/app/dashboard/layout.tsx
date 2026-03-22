@@ -4,14 +4,24 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Scissors, LayoutDashboard, Calendar, Users, UserCog,
-  Settings, LogOut, Menu, X, Zap
+  Scissors,
+  LayoutDashboard,
+  Calendar,
+  Users,
+  UserCog,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  Zap,
+  ClipboardList,
 } from 'lucide-react'
 
 // Todos los items de navegación con su rol requerido
 const navItems = [
   { href: '/dashboard',              label: 'Inicio',        icon: LayoutDashboard, adminOnly: false },
   { href: '/dashboard/appointments', label: 'Citas',         icon: Calendar,        adminOnly: false },
+  { href: '/dashboard/records',      label: 'Registros',     icon: ClipboardList,   adminOnly: false },
   { href: '/dashboard/customers',    label: 'Clientes',      icon: Users,           adminOnly: true  },
   { href: '/dashboard/barbers',      label: 'Barberos',      icon: UserCog,         adminOnly: true  },
   { href: '/dashboard/settings',     label: 'Configuración', icon: Settings,        adminOnly: true  },
@@ -20,7 +30,11 @@ const navItems = [
 async function getBusinessInfo(supabase: any, userId: string): Promise<{ name: string, role: string }> {
   // Buscar como dueño primero
   const { data: ownedBiz } = await supabase
-    .from('businesses').select('name').eq('owner_id', userId).single()
+    .from('businesses')
+    .select('name')
+    .eq('owner_id', userId)
+    .single()
+
   if (ownedBiz) return { name: ownedBiz.name, role: 'admin' }
 
   // Buscar como miembro
@@ -29,10 +43,14 @@ async function getBusinessInfo(supabase: any, userId: string): Promise<{ name: s
     .select('role, business_id')
     .eq('user_id', userId)
     .single()
+
   if (!member) return { name: 'Barbería', role: 'barber' }
 
   const { data: biz } = await supabase
-    .from('businesses').select('name').eq('id', member.business_id).single()
+    .from('businesses')
+    .select('name')
+    .eq('id', member.business_id)
+    .single()
 
   return {
     name: biz?.name || 'Barbería',
@@ -43,15 +61,19 @@ async function getBusinessInfo(supabase: any, userId: string): Promise<{ name: s
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [businessName, setBusinessName] = useState('Barbería El Estilo')
-  const [userEmail, setUserEmail]       = useState('')
-  const [userRole, setUserRole]         = useState<'admin' | 'barber'>('barber')
+  const [userEmail, setUserEmail] = useState('')
+  const [userRole, setUserRole] = useState<'admin' | 'barber'>('barber')
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) { router.push('/login'); return }
+      if (!data.user) {
+        router.push('/login')
+        return
+      }
+
       setUserEmail(data.user.email || '')
 
       const info = await getBusinessInfo(supabase, data.user.id)
@@ -92,6 +114,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <nav className="flex-1 px-3 py-4 space-y-1">
         {visibleNavItems.map(({ href, label, icon: Icon }) => {
           const active = href === '/dashboard' ? pathname === href : pathname.startsWith(href)
+
           return (
             <Link
               key={href}
@@ -117,7 +140,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs text-white truncate">{userEmail}</p>
-            {/* Badge de rol dinámico */}
             <p className="text-[10px] text-gray-500">
               {userRole === 'admin' ? 'Administrador' : 'Barbero'}
             </p>

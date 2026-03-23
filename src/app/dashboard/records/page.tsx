@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
+import * as XLSX from 'xlsx'
 import {
   Plus,
   Search,
@@ -18,6 +19,7 @@ import {
   CalendarRange,
   Users,
   RotateCcw,
+  Download,
 } from 'lucide-react'
 import type { Appointment, Barber, Service } from '@/lib/types'
 
@@ -41,7 +43,6 @@ const statusConfig = {
   pending: { label: 'Pendiente', class: 'badge-pending' },
   cancelled: { label: 'Cancelada', class: 'badge-cancelled' },
 }
-//fasdsadsadsa
 
 const sourceIcons = {
   voice: { icon: Phone, color: 'text-purple-400', label: 'Voz IA' },
@@ -75,6 +76,7 @@ export default function RecordsPage() {
   const [businessId, setBusinessId] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [showModal, setShowModal] = useState(false)
 
   const [filters, setFilters] = useState({
@@ -323,6 +325,75 @@ export default function RecordsPage() {
     }
   }, [filteredRecords])
 
+  function exportToExcel() {
+    try {
+      setExporting(true)
+
+      const summaryData = [
+        { Campo: 'Fecha de exportación', Valor: format(new Date(), 'dd/MM/yyyy HH:mm') },
+        { Campo: 'Desde', Valor: filters.from || 'No aplicado' },
+        { Campo: 'Hasta', Valor: filters.to || 'No aplicado' },
+        { Campo: 'Estado', Valor: filters.status || 'Todos' },
+        { Campo: 'Canal', Valor: filters.source || 'Todos' },
+        { Campo: 'Barbero', Valor: filters.barber_id ? (barbers.find(b => b.id === filters.barber_id)?.name || 'No encontrado') : 'Todos' },
+        { Campo: 'Búsqueda', Valor: filters.search || 'Sin búsqueda' },
+        { Campo: 'Total registros', Valor: metrics.total },
+        { Campo: 'Completadas', Valor: metrics.completed },
+        { Campo: 'Canceladas', Valor: metrics.cancelled },
+        { Campo: 'Clientes únicos', Valor: metrics.uniqueCustomers },
+        { Campo: 'Ingresos', Valor: Number(metrics.revenue.toFixed(2)) },
+      ]
+
+      const detailData = filteredRecords.map(record => ({
+        Fecha: format(toZonedTime(new Date(record.scheduled_at), TZ), 'dd/MM/yyyy'),
+        Hora: format(toZonedTime(new Date(record.scheduled_at), TZ), 'HH:mm'),
+        Cliente: (record.customer as any)?.name || 'Sin nombre',
+        Telefono: (record.customer as any)?.phone || 'Sin teléfono',
+        Barbero: (record.barber as any)?.name || '-',
+        Servicio: (record.service as any)?.name || '-',
+        Precio: Number((record.service as any)?.price || 0),
+        DuracionMinutos: (record.service as any)?.duration_minutes || record.duration_minutes || 0,
+        Estado: statusConfig[record.status as keyof typeof statusConfig]?.label || record.status,
+        Canal: sourceIcons[record.source as keyof typeof sourceIcons]?.label || record.source,
+        Notas: record.notes || '',
+      }))
+
+      const workbook = XLSX.utils.book_new()
+
+      const summarySheet = XLSX.utils.json_to_sheet(summaryData)
+      const detailSheet = XLSX.utils.json_to_sheet(detailData)
+
+      summarySheet['!cols'] = [
+        { wch: 24 },
+        { wch: 24 },
+      ]
+
+      detailSheet['!cols'] = [
+        { wch: 14 },
+        { wch: 10 },
+        { wch: 24 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 22 },
+        { wch: 12 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 35 },
+      ]
+
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen')
+      XLSX.utils.book_append_sheet(workbook, detailSheet, 'Registros')
+
+      const today = format(new Date(), 'yyyy-MM-dd')
+      XLSX.writeFile(workbook, `registros-${today}.xlsx`)
+    } catch (error) {
+      console.error('Error al exportar Excel:', error)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -333,13 +404,24 @@ export default function RecordsPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-orange-400"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo registro
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            onClick={exportToExcel}
+            disabled={exporting || loading || filteredRecords.length === 0}
+            className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-400 transition-all hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            {exporting ? 'Exportando...' : 'Exportar Excel'}
+          </button>
+
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-orange-400"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo registro
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -554,9 +636,9 @@ export default function RecordsPage() {
                 </tr>
               ) : (
                 filteredRecords.map(record => {
-                  const src = sourceIcons[record.source] || sourceIcons.manual
+                  const src = sourceIcons[record.source as keyof typeof sourceIcons] || sourceIcons.manual
                   const SrcIcon = src.icon
-                  const status = statusConfig[record.status] || statusConfig.pending
+                  const status = statusConfig[record.status as keyof typeof statusConfig] || statusConfig.pending
                   const price = Number((record.service as any)?.price || 0)
 
                   return (

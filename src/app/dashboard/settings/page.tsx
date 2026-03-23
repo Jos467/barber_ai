@@ -175,21 +175,6 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
-
-      {/* Info de API */}
-      <div className="glass rounded-2xl p-6 border border-orange-500/20">
-        <h2 className="font-syne font-semibold text-orange-400 mb-3">🔑 Información de API</h2>
-        <p className="text-gray-400 text-sm mb-3">Usa estos datos para configurar n8n y Vapi en los Días 2 y 3:</p>
-        <div className="bg-black/30 rounded-xl p-4 font-mono text-xs space-y-2">
-          <p className="text-gray-400">
-            Base URL: <span className="text-green-400">
-              {typeof window !== 'undefined' ? window.location.origin : 'https://tu-proyecto.vercel.app'}
-            </span>
-          </p>
-          <p className="text-gray-400">API Key: <span className="text-orange-400">barberai_secret_2026</span></p>
-          <p className="text-gray-400">Header: <span className="text-blue-400">x-api-key</span></p>
-        </div>
-      </div>
     </div>
   )
 }

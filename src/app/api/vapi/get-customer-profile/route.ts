@@ -17,12 +17,8 @@ function corsHeaders() {
 }
 
 function normalizeHnPhone(input: string) {
-  // Quita espacios, guiones, paréntesis, etc. Mantiene + si existe.
   const cleaned = input.trim().replace(/[^\d+]/g, "");
-
   if (cleaned.startsWith("+")) return cleaned;
-
-  // Solo Honduras: si no viene con + asumimos +504
   return `+504${cleaned}`;
 }
 
@@ -69,15 +65,16 @@ export async function POST(req: NextRequest) {
     }
 
     const phoneE164 = normalizeHnPhone(phoneRaw);
-    const phoneLocal = phoneE164.replace(/^\+504/, ""); // compat con datos viejos
+    const phoneLocal = phoneE164.replace(/^\+504/, "");
 
-    // Lookup tolerante: busca +504XXXXXXXX o XXXXXXXX
+    // En vez de maybeSingle(): traemos el más reciente
     const { data, error } = await supabase
       .from("customers")
-      .select("id, name, phone, business_id")
+      .select("id, name, phone, business_id, created_at")
       .eq("business_id", business_id)
       .or(`phone.eq.${phoneE164},phone.eq.${phoneLocal}`)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
 
     if (error) {
       return toolResult(toolCallId, {
@@ -87,7 +84,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (!data) {
+    const customer = data?.[0];
+
+    if (!customer) {
       return toolResult(toolCallId, {
         success: true,
         found: false,
@@ -98,11 +97,12 @@ export async function POST(req: NextRequest) {
     return toolResult(toolCallId, {
       success: true,
       found: true,
-      customer_id: data.id,
-      name: data.name,
-      phone: phoneE164, // devolvemos normalizado aunque en DB esté viejo
-      business_id: data.business_id,
-      stored_phone: data.phone, // útil para debug/migración
+      customer_id: customer.id,
+      name: customer.name,
+      phone: phoneE164, // devolvemos normalizado
+      business_id: customer.business_id,
+      stored_phone: customer.phone,
+      created_at: customer.created_at,
     });
   } catch (error) {
     return toolResult(toolCallId, {
